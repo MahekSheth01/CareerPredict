@@ -1,6 +1,6 @@
 # 🚀 AI Career Path Predictor
 
-A production-grade full-stack SaaS web application that uses self-built AI/ML models to predict ideal career paths based on skills, interests, and experience.
+A production-grade full-stack web application that uses self-built AI/ML models to predict ideal career paths based on skills, interests, and experience.
 
 ## 📋 Table of Contents
 
