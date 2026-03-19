@@ -1,0 +1,10 @@
+{
+  "Canva": "custom_canva",
+  "Adobe express": "custom_adobe_express",
+  "Expressjs": "custom_expressjs",
+  "Html": "custom_html",
+  "CSS": "custom_css",
+  "Bootstrap": "custom_bootstrap",
+  "Tailwind CSS": "custom_tailwind_css",
+  "C#": "custom_c#"
+}

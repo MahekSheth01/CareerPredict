@@ -1,0 +1,93 @@
+import Assessment from '../models/Assessment.js';
+import Project from '../models/Project.js';
+
+const careerRegex = (name) =>
+    new RegExp(`^${name.trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+
+// @desc    Get project recommendations for user
+// @route   GET /api/projects/recommend
+// @access  Private (Student)
+export const getProjectRecommendations = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const assessment = await Assessment.findOne({ userId });
+        if (!assessment || !assessment.predictionResult) {
+            return res.status(200).json({
+                success: true,
+                data: { recommended_projects: [], top_career: null, total: 0 },
+                message: 'Please complete your career assessment to get project recommendations.',
+            });
+        }
+
+        const { topCareers } = assessment.predictionResult;
+        if (!topCareers || topCareers.length === 0) {
+            return res.status(200).json({
+                success: true,
+                data: { recommended_projects: [], top_career: null, total: 0 },
+            });
+        }
+
+        // User skills — normalized lowercase
+        const userSkills = new Set(
+            (assessment.technicalSkills || []).map(s => s.toLowerCase().trim())
+        );
+
+        // Fetch projects matching any of top careers — case-insensitive
+        const careerFilters = topCareers.map(c => ({ career_category: careerRegex(c.careerName) }));
+        let projects = await Project.find({ $or: careerFilters });
+
+        // Fallback: return all projects if nothing matched
+        if (projects.length === 0) {
+            projects = await Project.find({}).limit(16);
+        }
+
+        // Score by skill overlap
+        const scored = projects.map((project, idx) => {
+            const required = project.required_skills.map(s => s.toLowerCase().trim());
+            const matched = required.filter(s => userSkills.has(s));
+            const matchScore = required.length > 0
+                ? Math.round((matched.length / required.length) * 100)
+                : 0;
+
+            // Career priority: projects matching top career rank higher
+            const careerPriorityIdx = topCareers.findIndex(
+                c => c.careerName.toLowerCase() === project.career_category.toLowerCase()
+            );
+            const careerPriority = careerPriorityIdx >= 0 ? topCareers.length - careerPriorityIdx : 0;
+
+            return {
+                _id: project._id,
+                title: project.project_title,
+                career_category: project.career_category,
+                difficulty_level: project.difficulty_level,
+                required_skills: project.required_skills,
+                description: project.description,
+                github_example: project.github_example,
+                estimated_duration: project.estimated_duration,
+                matched_skills: matched.map(s => s.charAt(0).toUpperCase() + s.slice(1)),
+                match_score: matchScore,
+                career_priority: careerPriority,
+            };
+        });
+
+        // Sort by career priority then match score
+        scored.sort((a, b) => b.career_priority - a.career_priority || b.match_score - a.match_score);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                recommended_projects: scored,
+                top_career: topCareers[0]?.careerName || null,
+                total: scored.length,
+            },
+        });
+    } catch (error) {
+        console.error('Project recommendations error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching project recommendations',
+            error: error.message,
+        });
+    }
+};

@@ -1,0 +1,409 @@
+{
+    "python": [
+        "python",
+        "python3",
+        "python 3"
+    ],
+    "javascript": [
+        "javascript",
+        "ecmascript",
+        "es6",
+        "es2015",
+        "es2016",
+        "es2017"
+    ],
+    "typescript": [
+        "typescript"
+    ],
+    "java": [
+        "java",
+        "jdk",
+        "jvm",
+        "java se",
+        "java ee"
+    ],
+    "c++": [
+        "c++",
+        "cpp",
+        "c plus plus"
+    ],
+    "c#": [
+        "c#",
+        "csharp",
+        "c sharp",
+        ".net",
+        "dotnet",
+        "asp.net"
+    ],
+    "c": [
+        "c programming",
+        "ansi c",
+        "c language"
+    ],
+    "go": [
+        "golang"
+    ],
+    "rust": [
+        "rust",
+        "rustlang"
+    ],
+    "ruby": [
+        "ruby",
+        "rails",
+        "ruby on rails"
+    ],
+    "php": [
+        "php",
+        "laravel",
+        "symfony"
+    ],
+    "swift": [
+        "swift",
+        "swiftui"
+    ],
+    "kotlin": [
+        "kotlin",
+        "android kotlin"
+    ],
+    "r": [
+        "r programming",
+        "r language",
+        "rstudio"
+    ],
+    "sql": [
+        "sql",
+        "mysql",
+        "postgresql",
+        "postgres",
+        "sqlite",
+        "mssql",
+        "oracle sql",
+        "pl/sql",
+        "t-sql",
+        "mariadb"
+    ],
+    "nosql": [
+        "nosql",
+        "mongodb",
+        "cassandra",
+        "couchdb",
+        "dynamodb",
+        "firebase",
+        "firestore"
+    ],
+    "react": [
+        "react",
+        "reactjs",
+        "react.js",
+        "react native",
+        "react native"
+    ],
+    "angular": [
+        "angular",
+        "angularjs",
+        "angular.js",
+        "angular 2",
+        "angular 4",
+        "angular cli"
+    ],
+    "vue": [
+        "vue",
+        "vuejs",
+        "vue.js",
+        "nuxt",
+        "nuxt.js"
+    ],
+    "node.js": [
+        "node.js",
+        "nodejs",
+        "express.js",
+        "expressjs"
+    ],
+    "django": [
+        "django",
+        "django rest framework",
+        "django rest",
+        "drf"
+    ],
+    "flask": [
+        "flask",
+        "flask api"
+    ],
+    "spring": [
+        "spring",
+        "spring boot",
+        "spring framework",
+        "spring mvc"
+    ],
+    "html": [
+        "html",
+        "html5"
+    ],
+    "css": [
+        "css",
+        "css3",
+        "sass",
+        "scss",
+        "less",
+        "tailwind",
+        "tailwindcss",
+        "bootstrap"
+    ],
+    "machine learning": [
+        "machine learning",
+        "deep learning",
+        "neural network",
+        "neural networks",
+        "reinforcement learning",
+        "supervised learning",
+        "unsupervised learning"
+    ],
+    "artificial intelligence": [
+        "artificial intelligence",
+        "cognitive computing",
+        "generative ai",
+        "large language model",
+        "llm"
+    ],
+    "natural language processing": [
+        "natural language processing",
+        "nlp",
+        "text mining",
+        "text analytics",
+        "sentiment analysis"
+    ],
+    "computer vision": [
+        "computer vision",
+        "image recognition",
+        "image processing",
+        "object detection",
+        "opencv"
+    ],
+    "data science": [
+        "data science",
+        "data analysis",
+        "data analytics",
+        "data mining",
+        "exploratory data analysis",
+        "eda"
+    ],
+    "tensorflow": [
+        "tensorflow",
+        "keras"
+    ],
+    "pytorch": [
+        "pytorch",
+        "torch"
+    ],
+    "scikit-learn": [
+        "scikit-learn",
+        "sklearn",
+        "scikit learn"
+    ],
+    "pandas": [
+        "pandas",
+        "dataframe"
+    ],
+    "numpy": [
+        "numpy",
+        "numerical python"
+    ],
+    "data visualization": [
+        "data visualization",
+        "matplotlib",
+        "seaborn",
+        "plotly",
+        "tableau",
+        "power bi",
+        "d3.js"
+    ],
+    "cloud computing": [
+        "cloud computing",
+        "aws",
+        "amazon web services",
+        "azure",
+        "microsoft azure",
+        "gcp",
+        "google cloud",
+        "google cloud platform",
+        "cloud infrastructure"
+    ],
+    "docker": [
+        "docker",
+        "containerization",
+        "docker compose",
+        "dockerfile"
+    ],
+    "kubernetes": [
+        "kubernetes",
+        "k8s",
+        "container orchestration",
+        "helm"
+    ],
+    "devops": [
+        "devops",
+        "ci/cd",
+        "continuous integration",
+        "continuous deployment",
+        "continuous delivery",
+        "jenkins",
+        "github actions",
+        "gitlab ci",
+        "travis ci",
+        "circleci"
+    ],
+    "git": [
+        "git",
+        "github",
+        "gitlab",
+        "bitbucket",
+        "version control"
+    ],
+    "linux": [
+        "linux",
+        "unix",
+        "ubuntu",
+        "centos",
+        "bash",
+        "shell scripting",
+        "shell script"
+    ],
+    "networking": [
+        "networking",
+        "tcp/ip",
+        "dns",
+        "restful api",
+        "rest api",
+        "http/https",
+        "grpc",
+        "websocket"
+    ],
+    "cybersecurity": [
+        "cybersecurity",
+        "cyber security",
+        "penetration testing",
+        "ethical hacking",
+        "infosec",
+        "information security",
+        "network security",
+        "vulnerability assessment"
+    ],
+    "blockchain": [
+        "blockchain",
+        "smart contracts",
+        "solidity",
+        "ethereum",
+        "web3",
+        "defi",
+        "nft"
+    ],
+    "agile": [
+        "agile",
+        "scrum",
+        "kanban",
+        "sprint planning",
+        "jira",
+        "agile methodology",
+        "agile development"
+    ],
+    "project management": [
+        "project management",
+        "pmp",
+        "project planning",
+        "project coordination"
+    ],
+    "communication": [
+        "communication skills",
+        "verbal communication",
+        "written communication",
+        "presentation skills"
+    ],
+    "problem solving": [
+        "problem solving",
+        "analytical thinking",
+        "critical thinking"
+    ],
+    "teamwork": [
+        "teamwork",
+        "team collaboration",
+        "cross-functional",
+        "team player"
+    ],
+    "leadership": [
+        "leadership",
+        "team leadership",
+        "team management",
+        "mentoring",
+        "mentorship"
+    ],
+    "testing": [
+        "unit testing",
+        "integration testing",
+        "selenium",
+        "jest",
+        "pytest",
+        "quality assurance",
+        "test automation",
+        "test driven development",
+        "tdd"
+    ],
+    "microservices": [
+        "microservices",
+        "microservice architecture",
+        "service oriented architecture",
+        "soa"
+    ],
+    "graphql": [
+        "graphql",
+        "apollo graphql",
+        "hasura"
+    ],
+    "redis": [
+        "redis",
+        "in-memory database",
+        "redis cache"
+    ],
+    "elasticsearch": [
+        "elasticsearch",
+        "elk stack",
+        "kibana",
+        "logstash",
+        "opensearch"
+    ],
+    "figma": [
+        "figma",
+        "ui design",
+        "ux design",
+        "ui/ux",
+        "user interface design",
+        "user experience design",
+        "adobe xd",
+        "sketch"
+    ],
+    "power bi": [
+        "power bi",
+        "business intelligence"
+    ],
+    "excel": [
+        "microsoft excel",
+        "excel",
+        "spreadsheet",
+        "vlookup",
+        "pivot table"
+    ],
+    "hadoop": [
+        "hadoop",
+        "mapreduce",
+        "hdfs",
+        "apache spark",
+        "pyspark",
+        "big data"
+    ],
+    "statistics": [
+        "statistics",
+        "statistical analysis",
+        "hypothesis testing",
+        "regression analysis",
+        "probability"
+    ]
+}
