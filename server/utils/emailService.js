@@ -1,16 +1,42 @@
 import nodemailer from 'nodemailer';
 
-// Create transporter
+// Create and verify transporter
 const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: false, // true for 465, false for other ports
+  const port = parseInt(process.env.EMAIL_PORT) || 587;
+  const transporter = nodemailer.createTransport({
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port,
+    secure: port === 465,       // true only for port 465
+    requireTLS: port === 587,   // force STARTTLS on port 587 (required by Gmail in prod)
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD,
     },
+    tls: {
+      rejectUnauthorized: false, // allow self-signed certs on some hosts
+    },
   });
+
+  // Verify connection at startup — errors appear in Render logs
+  transporter.verify((error) => {
+    if (error) {
+      console.error('❌ SMTP connection failed:', error.message);
+      console.error('   EMAIL_HOST:', process.env.EMAIL_HOST);
+      console.error('   EMAIL_PORT:', process.env.EMAIL_PORT);
+      console.error('   EMAIL_USER:', process.env.EMAIL_USER);
+      console.error('   EMAIL_PASSWORD set:', !!process.env.EMAIL_PASSWORD);
+    } else {
+      console.log('✅ SMTP server is ready to send emails');
+    }
+  });
+
+  return transporter;
+};
+
+// Resolve sender address — fall back to EMAIL_USER if EMAIL_FROM is not set
+const getSender = () => {
+  const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+  return `"AI Career Predictor" <${from}>`;
 };
 
 // Send verification email
@@ -19,7 +45,7 @@ export const sendVerificationEmail = async (email, name, token) => {
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
   const mailOptions = {
-    from: `"AI Career Predictor" <${process.env.EMAIL_FROM}>`,
+    from: getSender(),
     to: email,
     subject: 'Verify Your Email - AI Career Predictor',
     html: `
@@ -76,7 +102,7 @@ export const sendPasswordResetEmail = async (email, name, token) => {
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
   const mailOptions = {
-    from: `"AI Career Predictor" <${process.env.EMAIL_FROM}>`,
+    from: getSender(),
     to: email,
     subject: 'Reset Your Password - AI Career Predictor',
     html: `
