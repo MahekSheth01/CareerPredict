@@ -13,7 +13,7 @@ Key improvements over v1:
 
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
@@ -291,7 +291,7 @@ def generate_career_features(career: str) -> dict:
 
 
 # ── Data generation ────────────────────────────────────────────────────
-def generate_training_data(n_samples: int = 20_000) -> pd.DataFrame:
+def generate_training_data(n_samples: int = 3_000) -> pd.DataFrame:
     """
     Generate n_samples training records.
     Label each record by calling determine_career() on its features so that
@@ -328,16 +328,13 @@ def generate_training_data(n_samples: int = 20_000) -> pd.DataFrame:
 # ── Model training ─────────────────────────────────────────────────────
 def train_models():
     print("=" * 60)
-    print("  CareerPredict — High-Accuracy Model Trainer")
+    print("  CareerPredict — Fast Build Model Trainer")
     print("=" * 60)
 
-    print("\n[*] Generating training data (this may take ~30 s) ...")
-    df = generate_training_data(n_samples=20_000)
-    print(f"[+] Generated {len(df)} clean, self-consistent training samples")
+    print("\n[*] Generating training data ...")
+    df = generate_training_data(n_samples=3_000)
+    print(f"[+] Generated {len(df)} training samples")
     print(f"    Class distribution:\n{df['career'].value_counts().to_string()}\n")
-
-    # Save sample
-    df.head(200).to_csv('app/models/sample_data.csv', index=False)
 
     X = df.drop('career', axis=1)
     y = df['career']
@@ -347,59 +344,31 @@ def train_models():
     )
     print(f"[*] Train: {len(X_train)}  |  Test: {len(X_test)}")
 
-    # ── Random Forest ──────────────────────────────────────────────────
-    print("\n[*] Training Random Forest ...")
-    rf = RandomForestClassifier(
-        n_estimators=500,
-        max_depth=None,          # grow fully — data is clean so no overfitting risk
+    # ── RandomForest (single, fast) ────────────────────────────────────
+    print("\n[*] Training RandomForest classifier ...")
+    classifier = RandomForestClassifier(
+        n_estimators=100,
+        max_depth=None,
         min_samples_leaf=1,
-        min_samples_split=2,
         max_features='sqrt',
         class_weight='balanced',
         random_state=42,
         n_jobs=-1,
     )
-    rf.fit(X_train, y_train)
-    rf_acc = accuracy_score(y_test, rf.predict(X_test))
-    print(f"    RF  test accuracy: {rf_acc*100:.2f}%")
+    classifier.fit(X_train, y_train)
 
-    # ── Gradient Boosting ──────────────────────────────────────────────
-    print("\n[*] Training Gradient Boosting ...")
-    gb = GradientBoostingClassifier(
-        n_estimators=300,
-        max_depth=6,
-        learning_rate=0.08,
-        subsample=0.85,
-        min_samples_leaf=1,
-        random_state=42,
-    )
-    gb.fit(X_train, y_train)
-    gb_acc = accuracy_score(y_test, gb.predict(X_test))
-    print(f"    GB  test accuracy: {gb_acc*100:.2f}%")
-
-    # ── Voting Ensemble ────────────────────────────────────────────────
-    print("\n[*] Building Voting Ensemble (RF + GB) ...")
-    ensemble = VotingClassifier(
-        estimators=[('rf', rf), ('gb', gb)],
-        voting='soft',     # average predicted probabilities
-        n_jobs=-1,
-    )
-    ensemble.fit(X_train, y_train)
-
-    train_acc = accuracy_score(y_train, ensemble.predict(X_train))
-    test_acc  = accuracy_score(y_test,  ensemble.predict(X_test))
+    train_acc = accuracy_score(y_train, classifier.predict(X_train))
+    test_acc  = accuracy_score(y_test,  classifier.predict(X_test))
 
     print(f"\n{'='*60}")
-    print(f"  Ensemble Training Accuracy : {train_acc*100:.2f}%")
-    print(f"  Ensemble Test     Accuracy : {test_acc*100:.2f}%")
+    print(f"  Training Accuracy : {train_acc*100:.2f}%")
+    print(f"  Test     Accuracy : {test_acc*100:.2f}%")
     print(f"{'='*60}")
-
     print("\n[*] Per-class Classification Report:")
-    print(classification_report(y_test, ensemble.predict(X_test), digits=4))
+    print(classification_report(y_test, classifier.predict(X_test), digits=4))
 
-    # Save the main classifier (ensemble)
-    joblib.dump(ensemble, 'app/models/saved/career_classifier.pkl')
-    print("[+] Saved ensemble classifier --> app/models/saved/career_classifier.pkl")
+    joblib.dump(classifier, 'app/models/saved/career_classifier.pkl')
+    print("[+] Saved classifier --> app/models/saved/career_classifier.pkl")
 
     # ── Clustering ────────────────────────────────────────────────────
     print("\n[*] Training KMeans Clustering ...")
@@ -419,7 +388,6 @@ def train_models():
     joblib.dump(feature_names, 'app/models/saved/feature_names.pkl')
 
     print("[+] Saved clustering model, scaler, cluster labels, feature names")
-
     print("\n[OK] Training complete! Models ready in app/models/saved/")
     print(f"    Final test accuracy: {test_acc*100:.2f}%")
 
