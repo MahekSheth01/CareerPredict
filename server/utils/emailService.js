@@ -1,30 +1,49 @@
 import nodemailer from 'nodemailer';
 
-// Create and verify transporter
+// ── Transporter factory ────────────────────────────────────────────────
+// Priority: Resend (cloud-reliable) → Gmail SMTP (fallback)
 const createTransporter = () => {
-  const port = parseInt(process.env.EMAIL_PORT) || 587;
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port,
-    secure: port === 465,       // true only for port 465
-    requireTLS: port === 587,   // force STARTTLS on port 587 (required by Gmail in prod)
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD,
-    },
-    tls: {
-      rejectUnauthorized: false, // allow self-signed certs on some hosts
-    },
-  });
+  let transporter;
 
-  // Verify connection at startup — errors appear in Render logs
+  if (process.env.RESEND_API_KEY) {
+    // Resend SMTP relay — works from any cloud host (uses HTTPS internally)
+    transporter = nodemailer.createTransport({
+      host: 'smtp.resend.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: 'resend',                        // always literally "resend"
+        pass: process.env.RESEND_API_KEY,
+      },
+    });
+    console.log('📧 Using Resend SMTP relay for email delivery');
+  } else {
+    // Fallback: Gmail SMTP (may be blocked on some cloud IPs)
+    const port = parseInt(process.env.EMAIL_PORT) || 587;
+    transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port,
+      secure: port === 465,
+      requireTLS: port === 587,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+      tls: { rejectUnauthorized: false },
+    });
+    console.warn('⚠️  RESEND_API_KEY not set — falling back to Gmail SMTP');
+  }
+
+  // Verify connection at startup so errors appear in Render logs immediately
   transporter.verify((error) => {
     if (error) {
       console.error('❌ SMTP connection failed:', error.message);
-      console.error('   EMAIL_HOST:', process.env.EMAIL_HOST);
-      console.error('   EMAIL_PORT:', process.env.EMAIL_PORT);
-      console.error('   EMAIL_USER:', process.env.EMAIL_USER);
-      console.error('   EMAIL_PASSWORD set:', !!process.env.EMAIL_PASSWORD);
+      if (process.env.RESEND_API_KEY) {
+        console.error('   Check that RESEND_API_KEY is a valid Resend API key');
+      } else {
+        console.error('   EMAIL_USER:', process.env.EMAIL_USER);
+        console.error('   EMAIL_PASSWORD set:', !!process.env.EMAIL_PASSWORD);
+      }
     } else {
       console.log('✅ SMTP server is ready to send emails');
     }
@@ -33,9 +52,9 @@ const createTransporter = () => {
   return transporter;
 };
 
-// Resolve sender address — fall back to EMAIL_USER if EMAIL_FROM is not set
+// Sender address — use EMAIL_FROM if set, else EMAIL_USER, else resend default
 const getSender = () => {
-  const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+  const from = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@resend.dev';
   return `"AI Career Predictor" <${from}>`;
 };
 
