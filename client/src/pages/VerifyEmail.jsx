@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle, XCircle, Loader } from 'lucide-react';
 import api from '../utils/api';
@@ -8,6 +8,7 @@ const VerifyEmail = () => {
     const [searchParams] = useSearchParams();
     const [status, setStatus] = useState('loading');
     const [message, setMessage] = useState('');
+    const navigate = useNavigate();
 
     useEffect(() => {
         const verifyEmail = async () => {
@@ -23,6 +24,11 @@ const VerifyEmail = () => {
                 const { data } = await api.get(`/auth/verify-email/${token}`);
                 setStatus('success');
                 setMessage(data.message);
+                
+                // Automatically redirect to login after 3 seconds
+                setTimeout(() => {
+                    navigate('/login');
+                }, 3000);
             } catch (error) {
                 setStatus('error');
                 setMessage(error.response?.data?.message || 'Verification failed');
@@ -30,7 +36,7 @@ const VerifyEmail = () => {
         };
 
         verifyEmail();
-    }, [searchParams]);
+    }, [searchParams, navigate]);
 
     return (
         <div className="min-h-screen flex items-center justify-center py-12 px-4 bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-gray-900 dark:to-gray-800">
@@ -54,8 +60,11 @@ const VerifyEmail = () => {
                         </div>
                         <h2 className="text-2xl font-bold mb-2">Email Verified!</h2>
                         <p className="text-gray-600 dark:text-gray-300 mb-6">{message}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                            Redirecting to login in 3 seconds...
+                        </p>
                         <Link to="/login" className="btn-primary">
-                            Go to Login
+                            Go to Login Now
                         </Link>
                     </>
                 )}
