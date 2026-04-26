@@ -1,555 +1,357 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Users, BarChart3, Award, TrendingUp, Search, Filter,
-    ChevronLeft, ChevronRight, Eye, UserCheck, UserX,
-    Calendar, BookOpen, Target, Activity, PieChart
+    LayoutDashboard, Users, BookOpen, BarChart3, FileBarChart2,
+    Package, FileText, Server, Menu, X, RefreshCw, LogOut
 } from 'lucide-react';
-import {
-    PieChart as RePieChart, Pie, Cell, ResponsiveContainer,
-    BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line,
-    Legend, CartesianGrid
-} from 'recharts';
 import api from '../utils/api';
 
-const COLORS = ['#8b5cf6', '#d946ef', '#f472b6', '#fb923c', '#facc15', '#4ade80', '#22d3ee', '#60a5fa', '#a78bfa'];
+// Tab components
+import { StatCard, Card, SkeletonCard, COLORS } from '../components/admin/AdminUI';
+import UsersTab from '../components/admin/UsersTab';
+import AnalyticsTab from '../components/admin/AnalyticsTab';
+import AssessmentsTab from '../components/admin/AssessmentsTab';
+import MISReportsTab from '../components/admin/MISReportsTab';
+import ResumesTab from '../components/admin/ResumesTab';
+import SystemTab from '../components/admin/SystemTab';
 
+// Recharts for overview
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } from 'recharts';
+
+// ─── Existing ContentTab (imported inline) ───────────────────────────────────
+import ContentTabInner from '../components/admin/ContentTabInner';
+
+const TABS = [
+    { id: 'overview',    label: 'Overview',    icon: LayoutDashboard },
+    { id: 'users',       label: 'Users',        icon: Users },
+    { id: 'assessments', label: 'Assessments',  icon: BookOpen },
+    { id: 'analytics',  label: 'Analytics',    icon: BarChart3 },
+    { id: 'mis',        label: 'MIS Reports',  icon: FileBarChart2 },
+    { id: 'content',    label: 'Content',      icon: Package },
+    { id: 'resumes',    label: 'Resumes',      icon: FileText },
+    { id: 'system',     label: 'System',       icon: Server },
+];
+
+const tooltipStyle = {
+    backgroundColor: 'rgba(10,10,25,0.92)',
+    border: '1px solid rgba(139,92,246,0.3)',
+    borderRadius: '10px',
+    color: '#e2e8f0',
+    fontSize: 12,
+};
+
+// ─── Overview Tab ─────────────────────────────────────────────────────────────
+const OverviewTab = ({ analytics, assessments, monthly, systemStats }) => {
+    const careerData = analytics?.careerDistribution
+        ? Object.entries(analytics.careerDistribution).slice(0, 5).map(([name, value]) => ({ name, value }))
+        : [];
+
+    const recentAssessments = [...(assessments || [])]
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 6);
+
+    return (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+            {/* KPI Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard icon={Users} label="Total Users" value={systemStats?.totalUsers || analytics?.totalUsers || 0}
+                    sub={`+${systemStats?.newUsersThisMonth || 0} this month`} color="purple" delay={0} />
+                <StatCard icon={BookOpen} label="Assessments" value={systemStats?.totalAssessments || analytics?.totalAssessments || 0}
+                    sub={`+${systemStats?.newAssessmentsThisMonth || 0} this month`} color="blue" delay={0.05} />
+                <StatCard icon={BarChart3} label="Avg Readiness" value={`${analytics?.averageReadiness || 0}%`}
+                    sub="across all assessments" color="green" delay={0.1} />
+                <StatCard icon={FileText} label="Resumes Built" value={systemStats?.totalResumes || 0}
+                    sub={`${systemStats?.assessmentCompletionRate || 0}% completion rate`} color="orange" delay={0.15} />
+            </div>
+
+            {/* Charts row */}
+            <div className="grid md:grid-cols-2 gap-6">
+                <Card title="Monthly Activity (Last 12 Months)" delay={0.1}>
+                    <div className="p-4">
+                        <ResponsiveContainer width="100%" height={220}>
+                            <AreaChart data={monthly || []} margin={{ top: 5, right: 10, bottom: 0, left: -10 }}>
+                                <defs>
+                                    <linearGradient id="gradUsers" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="gradAssess" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.12)" />
+                                <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                                <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                                <Tooltip contentStyle={tooltipStyle} />
+                                <Area type="monotone" dataKey="users" name="Users" stroke="#8b5cf6" strokeWidth={2} fill="url(#gradUsers)" />
+                                <Area type="monotone" dataKey="assessments" name="Assessments" stroke="#22d3ee" strokeWidth={2} fill="url(#gradAssess)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </Card>
+
+                <Card title="Top Career Distribution" delay={0.15}>
+                    <div className="p-4 flex items-center gap-4">
+                        <ResponsiveContainer width="50%" height={200}>
+                            <PieChart>
+                                <Pie data={careerData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={45}>
+                                    {careerData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                                </Pie>
+                                <Tooltip contentStyle={tooltipStyle} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                        <div className="flex-1 space-y-2">
+                            {careerData.map((d, i) => (
+                                <div key={d.name} className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                                    <span className="text-xs text-gray-600 dark:text-gray-300 truncate flex-1">{d.name}</span>
+                                    <span className="text-xs font-bold text-gray-800 dark:text-gray-100">{d.value}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </Card>
+            </div>
+
+            {/* Recent Assessments */}
+            <Card title="Recent Assessments" delay={0.2}>
+                <div className="divide-y divide-gray-50 dark:divide-gray-700/50">
+                    {recentAssessments.map((a, i) => {
+                        const score = a.predictionResult?.readinessScore || 0;
+                        const career = a.predictionResult?.topCareers?.[0]?.careerName || 'N/A';
+                        const colorCls = score >= 70 ? 'text-emerald-600' : score >= 40 ? 'text-yellow-600' : 'text-red-500';
+                        return (
+                            <motion.div key={a._id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 + i * 0.04 }}
+                                className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                    {(a.userId?.name || '?').charAt(0).toUpperCase()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{a.userId?.name || 'Unknown'}</p>
+                                    <p className="text-xs text-gray-400 truncate">{career}</p>
+                                </div>
+                                <span className={`text-base font-bold ${colorCls}`}>{score}</span>
+                                <span className="text-xs text-gray-400 w-20 text-right flex-shrink-0">
+                                    {new Date(a.createdAt).toLocaleDateString('en-IN')}
+                                </span>
+                            </motion.div>
+                        );
+                    })}
+                    {recentAssessments.length === 0 && (
+                        <p className="text-center py-8 text-gray-400 text-sm">No assessments yet.</p>
+                    )}
+                </div>
+            </Card>
+        </motion.div>
+    );
+};
+
+// ─── Main Dashboard ───────────────────────────────────────────────────────────
 const AdminDashboard = () => {
     const [activeTab, setActiveTab] = useState('overview');
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
+    // Data states
     const [analytics, setAnalytics] = useState(null);
     const [users, setUsers] = useState([]);
     const [assessments, setAssessments] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [monthly, setMonthly] = useState([]);
+    const [skillGap, setSkillGap] = useState([]);
+    const [topCareers, setTopCareers] = useState([]);
+    const [resumeStats, setResumeStats] = useState(null);
+    const [systemStats, setSystemStats] = useState(null);
 
-    // Search and pagination states
-    const [searchQuery, setSearchQuery] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [usersPerPage] = useState(10);
-
-    useEffect(() => {
-        fetchData();
+    const fetchAll = useCallback(async () => {
+        try {
+            const [anaRes, usersRes, assessRes, monthlyRes, skillGapRes, topCareersRes, resumeRes, sysRes] = await Promise.all([
+                api.get('/careers/analytics/dashboard').catch(() => ({ data: { data: null } })),
+                api.get('/admin/users-enriched').catch(() => ({ data: { data: [] } })),
+                api.get('/assessments').catch(() => ({ data: { data: [] } })),
+                api.get('/admin/monthly-summary').catch(() => ({ data: { data: [] } })),
+                api.get('/admin/skill-gap').catch(() => ({ data: { data: [] } })),
+                api.get('/admin/top-careers').catch(() => ({ data: { data: [] } })),
+                api.get('/admin/resume-stats').catch(() => ({ data: { data: null } })),
+                api.get('/admin/system-stats').catch(() => ({ data: { data: null } })),
+            ]);
+            setAnalytics(anaRes.data.data);
+            setUsers(usersRes.data.data || []);
+            setAssessments(assessRes.data.data || []);
+            setMonthly(monthlyRes.data.data || []);
+            setSkillGap(skillGapRes.data.data || []);
+            setTopCareers(topCareersRes.data.data || []);
+            setResumeStats(resumeRes.data.data);
+            setSystemStats(sysRes.data.data);
+        } catch (err) {
+            console.error('Error fetching admin data:', err);
+        }
     }, []);
 
-    const fetchData = async () => {
-        try {
-            const [analyticsRes, usersRes, assessmentsRes] = await Promise.all([
-                api.get('/careers/analytics/dashboard'),
-                api.get('/careers/users/all'),
-                api.get('/assessments'),
-            ]);
-            setAnalytics(analyticsRes.data.data);
-            setUsers(usersRes.data.data);
-            setAssessments(assessmentsRes.data.data || []);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-        }
-        setLoading(false);
+    useEffect(() => {
+        const init = async () => {
+            setLoading(true);
+            await fetchAll();
+            setLoading(false);
+        };
+        init();
+    }, [fetchAll]);
+
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        await fetchAll();
+        setRefreshing(false);
     };
-
-    const toggleUserStatus = async (userId) => {
-        try {
-            await api.patch(`/careers/users/${userId}/toggle-status`);
-            fetchData();
-        } catch (error) {
-            alert('Error updating user status');
-        }
-    };
-
-    // Filter and paginate users
-    const filteredUsers = users.filter(user =>
-        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-    const indexOfLastUser = currentPage * usersPerPage;
-    const indexOfFirstUser = indexOfLastUser - usersPerPage;
-    const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
-    const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 dark:from-gray-900 dark:to-gray-800">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-600 border-t-transparent mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-gray-400">Loading admin dashboard...</p>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex">
+                {/* Sidebar skeleton */}
+                <div className="hidden md:flex flex-col w-60 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 p-4 gap-3">
+                    {TABS.map((_, i) => (
+                        <div key={i} className="h-10 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                    ))}
+                </div>
+                {/* Content skeleton */}
+                <div className="flex-1 p-6 space-y-6">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        {[...Array(4)].map((_, i) => <SkeletonCard key={i} />)}
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <SkeletonCard /><SkeletonCard />
+                    </div>
+                    <SkeletonCard />
                 </div>
             </div>
         );
     }
 
-    const careerData = analytics?.careerDistribution
-        ? Object.entries(analytics.careerDistribution).map(([name, value]) => ({ name, value }))
-        : [];
-
-    const tabs = [
-        { id: 'overview', label: 'Overview', icon: BarChart3 },
-        { id: 'users', label: 'Users', icon: Users },
-        { id: 'assessments', label: 'Assessments', icon: BookOpen },
-        { id: 'analytics', label: 'Analytics', icon: PieChart },
-    ];
-
     return (
-        <div className="min-h-screen py-8 px-4 bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-            <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-8"
-                >
-                    <h1 className="text-4xl md:text-5xl font-bold gradient-text mb-2">Admin Dashboard</h1>
-                    <p className="text-gray-600 dark:text-gray-400">Manage users, view analytics, and monitor assessments</p>
-                </motion.div>
-
-                {/* Tab Navigation */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-8"
-                >
-                    <div className="card-glass p-2 flex space-x-2 overflow-x-auto">
-                        {tabs.map((tab) => {
-                            const Icon = tab.icon;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === tab.id
-                                            ? 'bg-gradient-to-r from-primary-600 to-secondary-600 text-white shadow-lg'
-                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                        }`}
-                                >
-                                    <Icon className="w-5 h-5" />
-                                    <span>{tab.label}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </motion.div>
-
-                {/* Tab Content */}
-                <AnimatePresence mode="wait">
-                    {activeTab === 'overview' && (
-                        <OverviewTab key="overview" analytics={analytics} careerData={careerData} />
-                    )}
-                    {activeTab === 'users' && (
-                        <UsersTab
-                            key="users"
-                            users={currentUsers}
-                            searchQuery={searchQuery}
-                            setSearchQuery={setSearchQuery}
-                            currentPage={currentPage}
-                            setCurrentPage={setCurrentPage}
-                            totalPages={totalPages}
-                            toggleUserStatus={toggleUserStatus}
-                            totalUsers={filteredUsers.length}
-                        />
-                    )}
-                    {activeTab === 'assessments' && (
-                        <AssessmentsTab key="assessments" assessments={assessments} />
-                    )}
-                    {activeTab === 'analytics' && (
-                        <AnalyticsTab key="analytics" analytics={analytics} assessments={assessments} />
-                    )}
-                </AnimatePresence>
-            </div>
-        </div>
-    );
-};
-
-// Overview Tab Component
-const OverviewTab = ({ analytics, careerData }) => (
-    <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 20 }}
-    >
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatCard
-                icon={Users}
-                label="Total Users"
-                value={analytics?.totalUsers || 0}
-                color="primary"
-                delay={0}
-            />
-            <StatCard
-                icon={BookOpen}
-                label="Assessments"
-                value={analytics?.totalAssessments || 0}
-                color="secondary"
-                delay={0.1}
-            />
-            <StatCard
-                icon={TrendingUp}
-                label="Avg Readiness"
-                value={`${analytics?.averageReadiness || 0}%`}
-                color="green"
-                delay={0.2}
-            />
-            <StatCard
-                icon={Award}
-                label="Top Skill"
-                value={analytics?.topSkills?.[0]?.skill || 'N/A'}
-                color="yellow"
-                delay={0.3}
-                isText
-            />
-        </div>
-
-        {/* Charts Grid */}
-        <div className="grid md:grid-cols-2 gap-8">
-            <ChartCard title="Career Distribution" delay={0.4}>
-                <ResponsiveContainer width="100%" height={300}>
-                    <RePieChart>
-                        <Pie
-                            data={careerData}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={100}
-                            label
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex overflow-hidden">
+            {/* ── Sidebar ── */}
+            <AnimatePresence>
+                {(sidebarOpen || true) && (
+                    <>
+                        {/* Mobile overlay */}
+                        {sidebarOpen && (
+                            <motion.div
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-20 bg-black/50 md:hidden"
+                                onClick={() => setSidebarOpen(false)}
+                            />
+                        )}
+                        <motion.aside
+                            initial={{ x: -260 }} animate={{ x: 0 }}
+                            className={`fixed md:relative z-30 md:z-auto flex flex-col w-60 h-screen bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex-shrink-0 ${sidebarOpen ? 'flex' : 'hidden md:flex'}`}
                         >
-                            {careerData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                    </RePieChart>
-                </ResponsiveContainer>
-            </ChartCard>
-
-            <ChartCard title="Top 5 Skills" delay={0.5}>
-                <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={analytics?.topSkills?.slice(0, 5) || []}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis dataKey="skill" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
-            </ChartCard>
-        </div>
-    </motion.div>
-);
-
-// Users Tab Component
-const UsersTab = ({ users, searchQuery, setSearchQuery, currentPage, setCurrentPage, totalPages, toggleUserStatus, totalUsers }) => (
-    <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 20 }}
-    >
-        <div className="card-glass mb-6">
-            <div className="p-6">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                        <h2 className="text-2xl font-bold mb-1">User Management</h2>
-                        <p className="text-gray-600 dark:text-gray-400">{totalUsers} total users</p>
-                    </div>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search users..."
-                            value={searchQuery}
-                            onChange={(e) => {
-                                setSearchQuery(e.target.value);
-                                setCurrentPage(1);
-                            }}
-                            className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <div className="overflow-x-auto">
-                <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-800">
-                        <tr>
-                            <th className="text-left py-4 px-6 font-semibold text-sm text-gray-600 dark:text-gray-400">User</th>
-                            <th className="text-left py-4 px-6 font-semibold text-sm text-gray-600 dark:text-gray-400">Email</th>
-                            <th className="text-left py-4 px-6 font-semibold text-sm text-gray-600 dark:text-gray-400">Role</th>
-                            <th className="text-left py-4 px-6 font-semibold text-sm text-gray-600 dark:text-gray-400">Status</th>
-                            <th className="text-left py-4 px-6 font-semibold text-sm text-gray-600 dark:text-gray-400">Verified</th>
-                            <th className="text-left py-4 px-6 font-semibold text-sm text-gray-600 dark:text-gray-400">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {users.map((user, index) => (
-                            <motion.tr
-                                key={user._id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.05 }}
-                                className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                            >
-                                <td className="py-4 px-6">
-                                    <div className="flex items-center space-x-3">
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-600 to-secondary-600 flex items-center justify-center text-white font-bold">
-                                            {user.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <span className="font-medium">{user.name}</span>
+                            {/* Brand */}
+                            <div className="p-5 border-b border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center">
+                                        <LayoutDashboard className="w-4 h-4 text-white" />
                                     </div>
-                                </td>
-                                <td className="py-4 px-6 text-gray-600 dark:text-gray-400">{user.email}</td>
-                                <td className="py-4 px-6">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${user.role === 'admin'
-                                            ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
-                                            : 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                                        }`}>
-                                        {user.role}
-                                    </span>
-                                </td>
-                                <td className="py-4 px-6">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1 w-fit ${user.isActive
-                                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                                            : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                                        }`}>
-                                        {user.isActive ? <UserCheck className="w-3 h-3" /> : <UserX className="w-3 h-3" />}
-                                        <span>{user.isActive ? 'Active' : 'Disabled'}</span>
-                                    </span>
-                                </td>
-                                <td className="py-4 px-6">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${user.isVerified
-                                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                                            : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
-                                        }`}>
-                                        {user.isVerified ? 'Yes' : 'No'}
-                                    </span>
-                                </td>
-                                <td className="py-4 px-6">
-                                    <button
-                                        onClick={() => toggleUserStatus(user._id)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${user.isActive
-                                                ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30'
-                                                : 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30'
+                                    <span className="font-bold text-gray-900 dark:text-white text-sm">Admin MIS</span>
+                                </div>
+                                <div className="p-3 rounded-xl bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 border border-violet-100 dark:border-violet-800">
+                                    <p className="text-xs font-semibold text-violet-700 dark:text-violet-400">CareerPredict</p>
+                                    <p className="text-xs text-violet-500 dark:text-violet-500">{new Date().toLocaleDateString('en-IN', { dateStyle: 'medium' })}</p>
+                                </div>
+                            </div>
+
+                            {/* Nav */}
+                            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+                                {TABS.map(tab => {
+                                    const Icon = tab.icon;
+                                    const active = activeTab === tab.id;
+                                    return (
+                                        <button key={tab.id}
+                                            onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
+                                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                                                active
+                                                    ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-md shadow-violet-200 dark:shadow-violet-900/30'
+                                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                                             }`}
-                                    >
-                                        {user.isActive ? 'Disable' : 'Enable'}
-                                    </button>
-                                </td>
-                            </motion.tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                                        >
+                                            <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-white' : ''}`} />
+                                            {tab.label}
+                                        </button>
+                                    );
+                                })}
+                            </nav>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <div className="p-6 border-t dark:border-gray-700">
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Page {currentPage} of {totalPages}
-                        </p>
-                        <div className="flex space-x-2">
-                            <button
-                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                                disabled={currentPage === 1}
-                                className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                <ChevronLeft className="w-5 h-5" />
-                            </button>
-                            <button
-                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                                disabled={currentPage === totalPages}
-                                className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                <ChevronRight className="w-5 h-5" />
-                            </button>
+                            {/* Footer */}
+                            <div className="p-3 border-t border-gray-100 dark:border-gray-800">
+                                <button onClick={handleRefresh} disabled={refreshing}
+                                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50">
+                                    <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                                    Refresh Data
+                                </button>
+                            </div>
+                        </motion.aside>
+                    </>
+                )}
+            </AnimatePresence>
+
+            {/* ── Main Content ── */}
+            <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+                {/* Top bar */}
+                <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-100 dark:border-gray-800 px-5 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => setSidebarOpen(o => !o)} className="md:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                        </button>
+                        <div>
+                            <h1 className="font-bold text-gray-900 dark:text-white text-base leading-tight">
+                                {TABS.find(t => t.id === activeTab)?.label}
+                            </h1>
+                            <p className="text-xs text-gray-400 hidden sm:block">CareerPredict Admin Dashboard</p>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
-    </motion.div>
-);
-
-// Assessments Tab Component
-const AssessmentsTab = ({ assessments }) => (
-    <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 20 }}
-    >
-        <div className="card-glass">
-            <div className="p-6 border-b dark:border-gray-700">
-                <h2 className="text-2xl font-bold mb-1">Assessment Submissions</h2>
-                <p className="text-gray-600 dark:text-gray-400">{assessments.length} total assessments</p>
-            </div>
-
-            <div className="overflow-x-auto">
-                <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-800">
-                        <tr>
-                            <th className="text-left py-4 px-6 font-semibold text-sm text-gray-600 dark:text-gray-400">User</th>
-                            <th className="text-left py-4 px-6 font-semibold text-sm text-gray-600 dark:text-gray-400">Submission Date</th>
-                            <th className="text-left py-4 px-6 font-semibold text-sm text-gray-600 dark:text-gray-400">Readiness Score</th>
-                            <th className="text-left py-4 px-6 font-semibold text-sm text-gray-600 dark:text-gray-400">Top Career</th>
-                            <th className="text-left py-4 px-6 font-semibold text-sm text-gray-600 dark:text-gray-400">Skills</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {assessments.map((assessment, index) => (
-                            <motion.tr
-                                key={assessment._id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.05 }}
-                                className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                            >
-                                <td className="py-4 px-6 font-medium">{assessment.userId?.name || 'Unknown'}</td>
-                                <td className="py-4 px-6 text-gray-600 dark:text-gray-400">
-                                    {assessment.predictionResult?.predictedAt
-                                        ? new Date(assessment.predictionResult.predictedAt).toLocaleDateString()
-                                        : 'N/A'}
-                                </td>
-                                <td className="py-4 px-6">
-                                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${(assessment.predictionResult?.readinessScore || 0) >= 70
-                                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                                            : (assessment.predictionResult?.readinessScore || 0) >= 50
-                                                ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
-                                                : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                                        }`}>
-                                        {assessment.predictionResult?.readinessScore || 0}
-                                    </span>
-                                </td>
-                                <td className="py-4 px-6 font-medium text-primary-600 dark:text-primary-400">
-                                    {assessment.predictionResult?.topCareers?.[0]?.careerName || 'N/A'}
-                                </td>
-                                <td className="py-4 px-6 text-gray-600 dark:text-gray-400">
-                                    {(assessment.technicalSkills?.length || 0) + (assessment.softSkills?.length || 0)}
-                                </td>
-                            </motion.tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {assessments.length === 0 && (
-                <div className="p-12 text-center">
-                    <Activity className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600 dark:text-gray-400 text-lg">No assessments submitted yet</p>
-                </div>
-            )}
-        </div>
-    </motion.div>
-);
-
-// Analytics Tab Component
-const AnalyticsTab = ({ analytics, assessments }) => {
-    const readinessDistribution = assessments.reduce((acc, a) => {
-        const score = a.predictionResult?.readinessScore || 0;
-        const range = score >= 80 ? '80-100' : score >= 60 ? '60-80' : score >= 40 ? '40-60' : '0-40';
-        acc[range] = (acc[range] || 0) + 1;
-        return acc;
-    }, {});
-
-    const readinessData = Object.entries(readinessDistribution).map(([range, count]) => ({
-        range,
-        count
-    }));
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-        >
-            <div className="grid md:grid-cols-2 gap-8">
-                <ChartCard title="Readiness Score Distribution" delay={0}>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={readinessData}>
-                            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                            <XAxis dataKey="range" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="count" fill="#22c55e" radius={[8, 8, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </ChartCard>
-
-                <ChartCard title="Assessment Stats" delay={0.2}>
-                    <div className="space-y-6 p-4">
-                        <div className="flex items-center justify-between p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-                            <div>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Total Submissions</p>
-                                <p className="text-3xl font-bold text-primary-600">{assessments.length}</p>
-                            </div>
-                            <BookOpen className="w-12 h-12 text-primary-600" />
+                    <div className="flex items-center gap-3">
+                        <div className="text-right hidden sm:block">
+                            <p className="text-xs text-gray-400">{users.length} users · {assessments.length} assessments</p>
                         </div>
-                        <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                            <div>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Avg Score</p>
-                                <p className="text-3xl font-bold text-green-600">
-                                    {analytics?.averageReadiness || 0}%
-                                </p>
-                            </div>
-                            <TrendingUp className="w-12 h-12 text-green-600" />
-                        </div>
-                        <div className="flex items-center justify-between p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                            <div>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Top Skill</p>
-                                <p className="text-xl font-bold text-yellow-600">
-                                    {analytics?.topSkills?.[0]?.skill || 'N/A'}
-                                </p>
-                            </div>
-                            <Award className="w-12 h-12 text-yellow-600" />
-                        </div>
+                        <button onClick={handleRefresh} disabled={refreshing}
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                            title="Refresh">
+                            <RefreshCw className={`w-4 h-4 text-gray-500 ${refreshing ? 'animate-spin' : ''}`} />
+                        </button>
                     </div>
-                </ChartCard>
+                </header>
+
+                {/* Tab content */}
+                <main className="flex-1 p-5 md:p-6">
+                    <AnimatePresence mode="wait">
+                        {activeTab === 'overview' && (
+                            <OverviewTab key="overview" analytics={analytics} assessments={assessments} monthly={monthly} systemStats={systemStats} />
+                        )}
+                        {activeTab === 'users' && (
+                            <UsersTab key="users" users={users} loading={false} />
+                        )}
+                        {activeTab === 'assessments' && (
+                            <AssessmentsTab key="assessments" assessments={assessments} />
+                        )}
+                        {activeTab === 'analytics' && (
+                            <AnalyticsTab key="analytics" analytics={analytics} assessments={assessments} monthly={monthly} />
+                        )}
+                        {activeTab === 'mis' && (
+                            <MISReportsTab key="mis" monthly={monthly} skillGap={skillGap} topCareers={topCareers} />
+                        )}
+                        {activeTab === 'content' && (
+                            <ContentTabInner key="content" />
+                        )}
+                        {activeTab === 'resumes' && (
+                            <ResumesTab key="resumes" resumeStats={resumeStats} />
+                        )}
+                        {activeTab === 'system' && (
+                            <SystemTab key="system" systemStats={systemStats} />
+                        )}
+                    </AnimatePresence>
+                </main>
             </div>
-        </motion.div>
+        </div>
     );
 };
-
-// Reusable Stat Card Component
-const StatCard = ({ icon: Icon, label, value, color, delay, isText = false }) => {
-    const colorClasses = {
-        primary: 'from-primary-600 to-primary-700',
-        secondary: 'from-secondary-600 to-secondary-700',
-        green: 'from-green-600 to-green-700',
-        yellow: 'from-yellow-600 to-yellow-700',
-    };
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay }}
-            className="card-glass overflow-hidden"
-        >
-            <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{label}</p>
-                    <div className={`p-3 rounded-lg bg-gradient-to-br ${colorClasses[color]}`}>
-                        <Icon className="w-6 h-6 text-white" />
-                    </div>
-                </div>
-                <p className={`${isText ? 'text-2xl' : 'text-4xl'} font-bold gradient-text`}>
-                    {value}
-                </p>
-            </div>
-        </motion.div>
-    );
-};
-
-// Reusable Chart Card Component
-const ChartCard = ({ title, children, delay = 0 }) => (
-    <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay }}
-        className="card-glass"
-    >
-        <div className="p-6">
-            <h3 className="text-xl font-bold mb-6">{title}</h3>
-            {children}
-        </div>
-    </motion.div>
-);
 
 export default AdminDashboard;

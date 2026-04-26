@@ -15,6 +15,7 @@ import jobRoutes from './routes/jobRoutes.js';
 import projectRoutes from './routes/projectRoutes.js';
 import resourceRoutes from './routes/resourceRoutes.js';
 import interviewRoutes from './routes/interviewRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -29,7 +30,8 @@ connectDB();
 app.use(cors({
     origin: [
         "http://localhost:5173",
-        "https://career-predict-catg.vercel.app"
+        "https://career-predict-catg.vercel.app",
+        "https://career-predict-catg-f68wwt1ky-maheksheth01s-projects.vercel.app"
     ],
     credentials: true
 }));
@@ -51,6 +53,7 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/interview', interviewRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {

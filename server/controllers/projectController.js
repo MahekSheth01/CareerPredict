@@ -91,3 +91,64 @@ export const getProjectRecommendations = async (req, res) => {
         });
     }
 };
+
+// @desc    Get all projects (admin listing)
+// @route   GET /api/projects
+// @access  Private (Admin)
+export const getAllProjects = async (req, res) => {
+    try {
+        const projects = await Project.find({}).sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: projects });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error fetching projects', error: error.message });
+    }
+};
+
+// @desc    Create a new project
+// @route   POST /api/projects
+// @access  Private (Admin)
+export const createProject = async (req, res) => {
+    try {
+        const { project_title, career_category, difficulty_level, required_skills, description, github_example, estimated_duration } = req.body;
+        if (!project_title || !career_category) {
+            return res.status(400).json({ success: false, message: 'Title and career category are required.' });
+        }
+        const project = await Project.create({
+            project_title, career_category,
+            difficulty_level: difficulty_level || 'Beginner',
+            required_skills: required_skills || [],
+            description: description || '',
+            github_example: github_example || '#',
+            estimated_duration: estimated_duration || '1-2 weeks',
+        });
+        res.status(201).json({ success: true, data: project, message: 'Project created successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error creating project', error: error.message });
+    }
+};
+
+// @desc    Update a project
+// @route   PUT /api/projects/:id
+// @access  Private (Admin)
+export const updateProject = async (req, res) => {
+    try {
+        const project = await Project.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        if (!project) return res.status(404).json({ success: false, message: 'Project not found.' });
+        res.status(200).json({ success: true, data: project, message: 'Project updated successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error updating project', error: error.message });
+    }
+};
+
+// @desc    Delete a project
+// @route   DELETE /api/projects/:id
+// @access  Private (Admin)
+export const deleteProject = async (req, res) => {
+    try {
+        const project = await Project.findByIdAndDelete(req.params.id);
+        if (!project) return res.status(404).json({ success: false, message: 'Project not found.' });
+        res.status(200).json({ success: true, message: 'Project deleted successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error deleting project', error: error.message });
+    }
+};

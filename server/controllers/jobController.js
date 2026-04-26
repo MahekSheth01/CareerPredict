@@ -87,3 +87,64 @@ export const getJobRecommendations = async (req, res) => {
         });
     }
 };
+
+// @desc    Get all jobs (for admin listing)
+// @route   GET /api/jobs
+// @access  Private (Admin)
+export const getAllJobs = async (req, res) => {
+    try {
+        const jobs = await Job.find({}).sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: jobs });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error fetching jobs', error: error.message });
+    }
+};
+
+// @desc    Create a new job
+// @route   POST /api/jobs
+// @access  Private (Admin)
+export const createJob = async (req, res) => {
+    try {
+        const { job_title, company_name, career_category, required_skills, experience_level, job_description, job_link, location } = req.body;
+        if (!job_title || !company_name || !career_category) {
+            return res.status(400).json({ success: false, message: 'Title, company, and career category are required.' });
+        }
+        const job = await Job.create({
+            job_title, company_name, career_category,
+            required_skills: required_skills || [],
+            experience_level: experience_level || 'Entry Level',
+            job_description: job_description || '',
+            job_link: job_link || '#',
+            location: location || 'Remote',
+        });
+        res.status(201).json({ success: true, data: job, message: 'Job created successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error creating job', error: error.message });
+    }
+};
+
+// @desc    Update an existing job
+// @route   PUT /api/jobs/:id
+// @access  Private (Admin)
+export const updateJob = async (req, res) => {
+    try {
+        const job = await Job.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found.' });
+        res.status(200).json({ success: true, data: job, message: 'Job updated successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error updating job', error: error.message });
+    }
+};
+
+// @desc    Delete a job
+// @route   DELETE /api/jobs/:id
+// @access  Private (Admin)
+export const deleteJob = async (req, res) => {
+    try {
+        const job = await Job.findByIdAndDelete(req.params.id);
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found.' });
+        res.status(200).json({ success: true, message: 'Job deleted successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error deleting job', error: error.message });
+    }
+};

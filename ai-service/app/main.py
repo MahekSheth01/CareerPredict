@@ -723,7 +723,7 @@ def _extract_structured_data(raw_text: str) -> dict:
     # ── Certifications ────────────────────────────────────────────────
     certs_text = sections.get("certifications", "")
     certifications = [
-        c.strip().lstrip("•\-–—*► ")
+        c.strip().lstrip(r"•\-–—*► ")
         for c in re.split(r"[\n,;]", certs_text)
         if c.strip() and len(c.strip()) > 3
     ]
@@ -736,7 +736,7 @@ def _extract_structured_data(raw_text: str) -> dict:
     skills_from_section: List[str] = []
     seen_lower: set = set()
     for tok in raw_skill_tokens:
-        tok = tok.strip().strip("•\-–—*► ()[]")
+        tok = tok.strip().strip(r"•\-–—*► ()[]")
         # Filter: must be between 2 and 50 chars, not pure digits, not a section header
         if 2 <= len(tok) <= 50 and not tok.isdigit() and not _SECTION_WORDS.match(tok):
             tok_lower = tok.lower()

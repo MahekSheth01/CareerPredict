@@ -3,6 +3,86 @@ import { motion } from 'framer-motion';
 import { Briefcase, MapPin, Star, ExternalLink, AlertCircle, TrendingUp, Search } from 'lucide-react';
 import api from '../utils/api';
 
+/**
+ * Extracts a human-readable company name from a job listing URL.
+ * Supports LinkedIn, Naukri, Indeed, Glassdoor, Internshala, Wellfound, and falls back to domain.
+ */
+const extractCompanyFromUrl = (url) => {
+    if (!url || url === '#') return null;
+    try {
+        const { hostname, pathname } = new URL(url);
+        const host = hostname.replace(/^www\./, '');
+        const toTitle = (str) =>
+            str.replace(/[-_+]/g, ' ')
+               .replace(/\b\w/g, (c) => c.toUpperCase())
+               .trim();
+
+        // LinkedIn: /jobs/view/.../  or  /company/COMPANY-NAME/
+        if (host.includes('linkedin.com')) {
+            const companyMatch = pathname.match(/\/company\/([^/?#]+)/);
+            if (companyMatch) return toTitle(companyMatch[1]);
+            // LinkedIn job URLs don't always embed company name — fallback to domain label
+            return 'LinkedIn Job';
+        }
+
+        // Naukri: job-listings-JOBTITLE-COMPANY-...
+        if (host.includes('naukri.com')) {
+            const parts = pathname.split('/').filter(Boolean);
+            const slug = parts.find((p) => p.startsWith('job-listings-'));
+            if (slug) {
+                // slug format: job-listings-frontend-developer-google-india-...
+                const words = slug.replace('job-listings-', '').split('-');
+                // Heuristic: try to find known company words or take last meaningful segment
+                return toTitle(words.slice(-3, -1).join('-')) || 'Naukri Job';
+            }
+            return 'Naukri Job';
+        }
+
+        // Indeed: /cmp/COMPANY-NAME/jobs or /viewjob?...
+        if (host.includes('indeed.com')) {
+            const companyMatch = pathname.match(/\/cmp\/([^/?#]+)/);
+            if (companyMatch) return toTitle(companyMatch[1]);
+            return 'Indeed Job';
+        }
+
+        // Glassdoor: /job-listing/TITLE-at-COMPANY-...
+        if (host.includes('glassdoor.com')) {
+            const slug = pathname.split('/').pop() || '';
+            const atIdx = slug.toLowerCase().indexOf('-at-');
+            if (atIdx !== -1) return toTitle(slug.slice(atIdx + 4).replace(/-\w{8,}$/, ''));
+            return 'Glassdoor Job';
+        }
+
+        // Internshala: /internship/detail/TITLE-internship-at-COMPANY
+        if (host.includes('internshala.com')) {
+            const slug = pathname.split('/').pop() || '';
+            const atIdx = slug.toLowerCase().indexOf('-at-');
+            if (atIdx !== -1) return toTitle(slug.slice(atIdx + 4));
+            return 'Internshala';
+        }
+
+        // Wellfound / AngelList: /company/COMPANY-NAME
+        if (host.includes('wellfound.com') || host.includes('angel.co')) {
+            const companyMatch = pathname.match(/\/company\/([^/?#]+)/);
+            if (companyMatch) return toTitle(companyMatch[1]);
+            return 'Wellfound';
+        }
+
+        // Monster, Shine, TimesJobs — extract subdomain or first path segment
+        if (host.includes('monster.') || host.includes('shine.com') || host.includes('timesjobs.com')) {
+            const parts = pathname.split('/').filter(Boolean);
+            if (parts.length > 1) return toTitle(parts[1]);
+        }
+
+        // Generic fallback: use domain root (e.g. "careers.google.com" → "Google")
+        const domainParts = host.split('.');
+        const meaningful = domainParts.find((p) => !['careers', 'jobs', 'hire', 'work', 'apply'].includes(p));
+        return meaningful ? toTitle(meaningful) : toTitle(domainParts[0]);
+    } catch {
+        return null;
+    }
+};
+
 const difficultyColor = {
     'Internship': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
     'Entry Level': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
@@ -58,11 +138,14 @@ const JobRecommendations = () => {
         let result = jobs;
         if (search) {
             const q = search.toLowerCase();
-            result = result.filter(j =>
-                j.title.toLowerCase().includes(q) ||
-                j.company.toLowerCase().includes(q) ||
-                j.required_skills.some(s => s.toLowerCase().includes(q))
-            );
+            result = result.filter(j => {
+                const company = (j.company || extractCompanyFromUrl(j.job_link) || '').toLowerCase();
+                return (
+                    j.title.toLowerCase().includes(q) ||
+                    company.includes(q) ||
+                    j.required_skills.some(s => s.toLowerCase().includes(q))
+                );
+            });
         }
         if (levelFilter !== 'All') {
             result = result.filter(j => j.experience_level === levelFilter);
@@ -156,7 +239,9 @@ const JobRecommendations = () => {
                                 <div className="flex items-start justify-between mb-3">
                                     <div>
                                         <h3 className="font-bold text-lg leading-tight">{job.title}</h3>
-                                        <p className="text-primary-600 dark:text-primary-400 font-medium">{job.company}</p>
+                                        <p className="text-primary-600 dark:text-primary-400 font-medium">
+                                            {job.company || extractCompanyFromUrl(job.job_link) || 'Company'}
+                                        </p>
                                     </div>
                                     <span className={`text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap ml-2 ${difficultyColor[job.experience_level] || ''}`}>
                                         {job.experience_level}

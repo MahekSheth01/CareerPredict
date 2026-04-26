@@ -90,3 +90,63 @@ export const getLearningResources = async (req, res) => {
         });
     }
 };
+
+// @desc    Get all resources (admin listing)
+// @route   GET /api/resources
+// @access  Private (Admin)
+export const getAllResources = async (req, res) => {
+    try {
+        const resources = await LearningResource.find({}).sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: resources });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error fetching resources', error: error.message });
+    }
+};
+
+// @desc    Create a learning resource
+// @route   POST /api/resources
+// @access  Private (Admin)
+export const createResource = async (req, res) => {
+    try {
+        const { skill_name, title, platform, resource_type, link, is_free, duration } = req.body;
+        if (!skill_name || !title || !platform) {
+            return res.status(400).json({ success: false, message: 'Skill name, title, and platform are required.' });
+        }
+        const resource = await LearningResource.create({
+            skill_name, title, platform,
+            resource_type: resource_type || 'course',
+            link: link || '#',
+            is_free: is_free !== undefined ? is_free : true,
+            duration: duration || 'Self-paced',
+        });
+        res.status(201).json({ success: true, data: resource, message: 'Resource created successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error creating resource', error: error.message });
+    }
+};
+
+// @desc    Update a learning resource
+// @route   PUT /api/resources/:id
+// @access  Private (Admin)
+export const updateResource = async (req, res) => {
+    try {
+        const resource = await LearningResource.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        if (!resource) return res.status(404).json({ success: false, message: 'Resource not found.' });
+        res.status(200).json({ success: true, data: resource, message: 'Resource updated successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error updating resource', error: error.message });
+    }
+};
+
+// @desc    Delete a learning resource
+// @route   DELETE /api/resources/:id
+// @access  Private (Admin)
+export const deleteResource = async (req, res) => {
+    try {
+        const resource = await LearningResource.findByIdAndDelete(req.params.id);
+        if (!resource) return res.status(404).json({ success: false, message: 'Resource not found.' });
+        res.status(200).json({ success: true, message: 'Resource deleted successfully.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error deleting resource', error: error.message });
+    }
+};
