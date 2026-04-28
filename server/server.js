@@ -27,12 +27,14 @@ const app = express();
 connectDB();
 
 // Middleware
+const allowedOrigins = /^https:\/\/career-predict-catg.*\.vercel\.app$|^http:\/\/localhost:\d+$/;
 app.use(cors({
-    origin: [
-        "http://localhost:5173",
-        "https://career-predict-catg.vercel.app",
-        "https://career-predict-catg-f68wwt1ky-maheksheth01s-projects.vercel.app"
-    ],
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, curl, Postman)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.test(origin)) return callback(null, true);
+        callback(new Error(`CORS blocked: ${origin}`));
+    },
     credentials: true
 }));
 app.use(express.json());
