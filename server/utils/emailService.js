@@ -14,6 +14,10 @@ const sendViaBrevo = async (to, subject, html) => {
             to: [{ email: to }],
             subject,
             htmlContent: html,
+            headers: { 'X-Mailin-Tag': 'careerpredict' },
+            params: {},
+            trackClicks: false,   // prevent Brevo wrapping links with tracking URLs
+            trackOpens: false,
         },
         {
             headers: {
