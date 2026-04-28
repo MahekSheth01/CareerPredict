@@ -56,20 +56,44 @@ export const signup = async (req, res) => {
             });
         }
 
-        // Check if user already exists
+        // Check if user already exists (skip unverified stale entries older than 24h)
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({
-                success: false,
-                message: 'User already exists with this email',
-            });
+            // Allow re-registration if user never verified and token has expired
+            const isStaleUnverified =
+                !existingUser.verified &&
+                existingUser.verificationTokenExpires &&
+                existingUser.verificationTokenExpires < Date.now();
+
+            if (!isStaleUnverified) {
+                return res.status(400).json({
+                    success: false,
+                    message: existingUser.verified
+                        ? 'User already exists with this email'
+                        : 'A verification email was already sent. Please check your inbox or wait 24 hours to re-register.',
+                });
+            }
+
+            // Clean up the stale unverified record so we can re-create
+            await User.deleteOne({ _id: existingUser._id });
         }
 
         // Generate verification token
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
 
-        // Create user
+        // ── STEP 1: Send email FIRST — only save to DB if email succeeds ──
+        try {
+            await sendVerificationEmail(email, name, verificationToken);
+        } catch (emailError) {
+            console.error('❌ Email sending failed — user NOT saved to DB:', emailError.message);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to send verification email. Please try again in a few minutes.',
+            });
+        }
+
+        // ── STEP 2: Email sent — now persist the user ──
         const user = await User.create({
             name,
             email,
@@ -78,17 +102,9 @@ export const signup = async (req, res) => {
             verificationTokenExpires,
         });
 
-        // Send verification email
-        try {
-            await sendVerificationEmail(email, name, verificationToken);
-        } catch (emailError) {
-            console.error('Email sending failed:', emailError);
-            // Continue even if email fails
-        }
-
         res.status(201).json({
             success: true,
-            message: 'Account created successfully! Please check your email to verify your account.',
+            message: 'Account created! A verification email has been sent to ' + email + '. Please verify to activate your account.',
             data: {
                 userId: user._id,
                 name: user.name,

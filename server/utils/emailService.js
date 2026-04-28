@@ -1,26 +1,26 @@
 import nodemailer from 'nodemailer';
 
-// ── Transporter factory ────────────────────────────────────────────────
-// Priority: Resend (cloud-reliable) → Gmail SMTP (fallback)
-const createTransporter = () => {
-  let transporter;
+// ── Singleton transporter (created once at startup, reused for every email) ──
+// This avoids the ~1-2 second overhead of creating a new connection per send.
+let _transporter = null;
+
+const getTransporter = () => {
+  if (_transporter) return _transporter;
 
   if (process.env.RESEND_API_KEY) {
-    // Resend SMTP relay — works from any cloud host (uses HTTPS internally)
-    transporter = nodemailer.createTransport({
+    _transporter = nodemailer.createTransport({
       host: 'smtp.resend.com',
       port: 465,
       secure: true,
       auth: {
-        user: 'resend',                        // always literally "resend"
+        user: 'resend',
         pass: process.env.RESEND_API_KEY,
       },
     });
     console.log('📧 Using Resend SMTP relay for email delivery');
   } else {
-    // Fallback: Gmail SMTP (may be blocked on some cloud IPs)
     const port = parseInt(process.env.EMAIL_PORT) || 587;
-    transporter = nodemailer.createTransport({
+    _transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
       port,
       secure: port === 465,
@@ -34,22 +34,17 @@ const createTransporter = () => {
     console.warn('⚠️  RESEND_API_KEY not set — falling back to Gmail SMTP');
   }
 
-  // Verify connection at startup so errors appear in Render logs immediately
-  transporter.verify((error) => {
+  // Verify once at startup (fire-and-forget — does NOT block email sends)
+  _transporter.verify((error) => {
     if (error) {
       console.error('❌ SMTP connection failed:', error.message);
-      if (process.env.RESEND_API_KEY) {
-        console.error('   Check that RESEND_API_KEY is a valid Resend API key');
-      } else {
-        console.error('   EMAIL_USER:', process.env.EMAIL_USER);
-        console.error('   EMAIL_PASSWORD set:', !!process.env.EMAIL_PASSWORD);
-      }
+      _transporter = null; // reset so next call retries
     } else {
       console.log('✅ SMTP server is ready to send emails');
     }
   });
 
-  return transporter;
+  return _transporter;
 };
 
 // Sender address — use EMAIL_FROM if set, else EMAIL_USER, else resend default
@@ -60,7 +55,7 @@ const getSender = () => {
 
 // Send verification email
 export const sendVerificationEmail = async (email, name, token) => {
-  const transporter = createTransporter();
+  const transporter = getTransporter();
   const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
   const mailOptions = {
@@ -117,7 +112,7 @@ export const sendVerificationEmail = async (email, name, token) => {
 
 // Send password reset email
 export const sendPasswordResetEmail = async (email, name, token) => {
-  const transporter = createTransporter();
+  const transporter = getTransporter();
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
   const mailOptions = {
