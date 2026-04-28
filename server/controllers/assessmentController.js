@@ -206,3 +206,64 @@ export const getAllAssessments = async (req, res) => {
         });
     }
 };
+
+// @desc    Guest career prediction (no login, no DB save)
+// @route   POST /api/assessments/guest
+// @access  Public
+export const guestPredict = async (req, res) => {
+    try {
+        const assessmentData = req.body;
+
+        // Call AI service
+        const aiResponse = await axios.post(`${process.env.AI_SERVICE_URL}/predict`, {
+            technicalSkills: assessmentData.technicalSkills || [],
+            softSkills: assessmentData.softSkills || [],
+            interests: assessmentData.interests || {},
+            gpa: assessmentData.gpa || 0,
+            strongSubjects: assessmentData.strongSubjects || [],
+            projectsCompleted: assessmentData.projectsCompleted || 0,
+            internshipExperience: assessmentData.internshipExperience || 'none',
+            preferredWorkStyle: assessmentData.preferredWorkStyle || 'flexible',
+        });
+
+        // Get career data for skill gap analysis
+        const careers = await Career.find({});
+        const careerMap = {};
+        careers.forEach(career => {
+            careerMap[career.careerName] = career.requiredSkills;
+        });
+
+        const userSkills = new Set([
+            ...(assessmentData.technicalSkills || []),
+            ...(assessmentData.softSkills || []),
+        ]);
+
+        const skillGap = aiResponse.data.predictions.map(prediction => {
+            const requiredSkills = careerMap[prediction.career] || [];
+            return {
+                career: prediction.career,
+                missingSkills: requiredSkills.filter(skill => !userSkills.has(skill)),
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                topCareers: aiResponse.data.predictions.map(p => ({
+                    careerName: p.career,
+                    probability: p.probability,
+                })),
+                clusterGroup: aiResponse.data.cluster,
+                skillGap,
+                readinessScore: aiResponse.data.readiness_score,
+            },
+        });
+    } catch (error) {
+        console.error('Guest predict error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Error generating prediction. Please try again.',
+            error: error.message,
+        });
+    }
+};

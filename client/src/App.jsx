@@ -11,6 +11,7 @@ import Signup from './pages/Signup';
 import VerifyEmail from './pages/VerifyEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import GuestAssessment from './pages/GuestAssessment';
 import StudentDashboard from './pages/StudentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import Assessment from './pages/Assessment';
@@ -39,6 +40,7 @@ function App() {
                             <Route path="/verify-email" element={<VerifyEmail />} />
                             <Route path="/forgot-password" element={<ForgotPassword />} />
                             <Route path="/reset-password" element={<ResetPassword />} />
+                            <Route path="/predict" element={<GuestAssessment />} />
 
                             {/* Student Routes */}
                             <Route path="/dashboard" element={<ProtectedRoute requiredRole="student"><StudentDashboard /></ProtectedRoute>} />

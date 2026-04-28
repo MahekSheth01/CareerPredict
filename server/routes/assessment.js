@@ -4,10 +4,14 @@ import {
     getMyAssessment,
     getCareerRoadmap,
     getAllAssessments,
+    guestPredict,
 } from '../controllers/assessmentController.js';
 import { verifyToken, authorizeRole } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Public guest prediction (no login needed)
+router.post('/guest', guestPredict);
 
 // Student routes
 router.post('/', verifyToken, authorizeRole('student'), submitAssessment);
