@@ -7,23 +7,28 @@ const getBaseUrl = () => (process.env.FRONTEND_URL || 'http://localhost:5173').t
 
 // ── Send via Brevo REST API ────────────────────────────────────────────────
 const sendViaBrevo = async (to, subject, html) => {
-    await axios.post(
-        'https://api.brevo.com/v3/smtp/email',
-        {
-            sender: { name: FROM_NAME, email: getFromEmail() },
-            to: [{ email: to }],
-            subject,
-            htmlContent: html,
-            trackClicks: false,
-            trackOpens: false,
-        },
-        {
-            headers: {
-                'api-key': process.env.BREVO_API_KEY,
-                'Content-Type': 'application/json',
+    try {
+        await axios.post(
+            'https://api.brevo.com/v3/smtp/email',
+            {
+                sender: { name: FROM_NAME, email: getFromEmail() },
+                to: [{ email: to }],
+                subject,
+                htmlContent: html,
             },
-        }
-    );
+            {
+                headers: {
+                    'api-key': process.env.BREVO_API_KEY,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+    } catch (err) {
+        // Log the full Brevo error response for debugging
+        const detail = err.response?.data;
+        console.error('❌ Brevo API error detail:', JSON.stringify(detail));
+        throw err;
+    }
 };
 
 // ── Singleton nodemailer transporter (Resend or SMTP fallback) ────────────
