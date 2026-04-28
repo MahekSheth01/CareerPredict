@@ -27,14 +27,8 @@ const app = express();
 connectDB();
 
 // Middleware
-const allowedOrigins = /^https:\/\/career-predict-catg.*\.vercel\.app$|^http:\/\/localhost:\d+$/;
 app.use(cors({
-    origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, Postman)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.test(origin)) return callback(null, true);
-        callback(new Error(`CORS blocked: ${origin}`));
-    },
+    origin: true, // reflect request origin — allows all origins incl. all Vercel previews
     credentials: true
 }));
 app.use(express.json());
