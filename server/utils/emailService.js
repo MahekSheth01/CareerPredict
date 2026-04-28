@@ -1,68 +1,93 @@
+import axios from 'axios';
 import nodemailer from 'nodemailer';
 
-// ── Singleton transporter (created once at startup, reused for every email) ──
-// This avoids the ~1-2 second overhead of creating a new connection per send.
+// ── Email sender helper ────────────────────────────────────────────────────
+// Priority: Brevo API → Resend SMTP → Gmail SMTP fallback
+
+const FROM_NAME = 'AI Career Predictor';
+const FROM_EMAIL = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@careerpredict.com';
+
+// ── Send via Brevo REST API (most reliable, no SMTP needed) ───────────────
+const sendViaBrevo = async (to, subject, html) => {
+    await axios.post(
+        'https://api.brevo.com/v3/smtp/email',
+        {
+            sender: { name: FROM_NAME, email: FROM_EMAIL },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+        },
+        {
+            headers: {
+                'api-key': process.env.BREVO_API_KEY,
+                'Content-Type': 'application/json',
+            },
+        }
+    );
+};
+
+// ── Singleton nodemailer transporter (Resend or Gmail fallback) ───────────
 let _transporter = null;
-
 const getTransporter = () => {
-  if (_transporter) return _transporter;
+    if (_transporter) return _transporter;
 
-  if (process.env.RESEND_API_KEY) {
-    _transporter = nodemailer.createTransport({
-      host: 'smtp.resend.com',
-      port: 465,
-      secure: true,
-      auth: {
-        user: 'resend',
-        pass: process.env.RESEND_API_KEY,
-      },
-    });
-    console.log('📧 Using Resend SMTP relay for email delivery');
-  } else {
-    const port = parseInt(process.env.EMAIL_PORT) || 587;
-    _transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port,
-      secure: port === 465,
-      requireTLS: port === 587,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-      tls: { rejectUnauthorized: false },
-    });
-    console.warn('⚠️  RESEND_API_KEY not set — falling back to Gmail SMTP');
-  }
-
-  // Verify once at startup (fire-and-forget — does NOT block email sends)
-  _transporter.verify((error) => {
-    if (error) {
-      console.error('❌ SMTP connection failed:', error.message);
-      _transporter = null; // reset so next call retries
+    if (process.env.RESEND_API_KEY) {
+        _transporter = nodemailer.createTransport({
+            host: 'smtp.resend.com',
+            port: 465,
+            secure: true,
+            auth: { user: 'resend', pass: process.env.RESEND_API_KEY },
+        });
+        console.log('📧 Using Resend SMTP for email delivery');
     } else {
-      console.log('✅ SMTP server is ready to send emails');
+        const port = parseInt(process.env.EMAIL_PORT) || 587;
+        _transporter = nodemailer.createTransport({
+            host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+            port,
+            secure: port === 465,
+            requireTLS: port === 587,
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASSWORD,
+            },
+            tls: { rejectUnauthorized: false },
+        });
+        console.warn('⚠️  Using SMTP fallback for email delivery');
     }
-  });
 
-  return _transporter;
+    _transporter.verify((error) => {
+        if (error) {
+            console.error('❌ SMTP connection failed:', error.message);
+            _transporter = null;
+        } else {
+            console.log('✅ SMTP server is ready to send emails');
+        }
+    });
+
+    return _transporter;
 };
 
-// Sender address — use EMAIL_FROM if set, else EMAIL_USER, else resend default
-const getSender = () => {
-  const from = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@resend.dev';
-  return `"AI Career Predictor" <${from}>`;
+// ── Core send function ─────────────────────────────────────────────────────
+const sendEmail = async (to, subject, html) => {
+    if (process.env.BREVO_API_KEY) {
+        console.log('📧 Using Brevo API for email delivery');
+        await sendViaBrevo(to, subject, html);
+    } else {
+        const transporter = getTransporter();
+        await transporter.sendMail({
+            from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
+            to,
+            subject,
+            html,
+        });
+    }
 };
 
-// Send verification email
+// ── Verification email ─────────────────────────────────────────────────────
 export const sendVerificationEmail = async (email, name, token) => {
-  const transporter = getTransporter();
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
-  const mailOptions = {
-    from: getSender(),
-    to: email,
-    subject: 'Verify Your Email - AI Career Predictor',
-    html: `
+    const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -77,49 +102,34 @@ export const sendVerificationEmail = async (email, name, token) => {
         </head>
         <body>
           <div class="container">
-            <div class="header">
-              <h1>🚀 Welcome to AI Career Predictor!</h1>
-            </div>
+            <div class="header"><h1>🚀 Welcome to AI Career Predictor!</h1></div>
             <div class="content">
               <h2>Hi ${name},</h2>
-              <p>Thank you for signing up! We're excited to help you discover your ideal career path.</p>
-              <p>Please verify your email address by clicking the button below:</p>
-              <center>
-                <a href="${verificationUrl}" class="button">Verify Email</a>
-              </center>
-              <p>Or copy and paste this link into your browser:</p>
-              <p style="background: #e0e0e0; padding: 10px; border-radius: 5px; word-break: break-all;">${verificationUrl}</p>
-              <p><strong>This link will expire in 24 hours.</strong></p>
-              <p>If you didn't create an account, please ignore this email.</p>
+              <p>Thank you for signing up! Please verify your email by clicking below:</p>
+              <center><a href="${verificationUrl}" class="button">Verify Email</a></center>
+              <p>Or paste this link: <br/><span style="background:#e0e0e0;padding:8px;border-radius:4px;word-break:break-all;">${verificationUrl}</span></p>
+              <p><strong>This link expires in 24 hours.</strong></p>
             </div>
-            <div class="footer">
-              <p>© 2026 AI Career Predictor. All rights reserved.</p>
-            </div>
+            <div class="footer"><p>© 2026 AI Career Predictor</p></div>
           </div>
         </body>
       </html>
-    `,
-  };
+    `;
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Verification email sent to ${email}`);
-  } catch (error) {
-    console.error(`❌ Error sending verification email: ${error.message}`);
-    throw error;
-  }
+    try {
+        await sendEmail(email, 'Verify Your Email - AI Career Predictor', html);
+        console.log(`✅ Verification email sent to ${email}`);
+    } catch (error) {
+        console.error(`❌ Error sending verification email: ${error.message}`);
+        throw error;
+    }
 };
 
-// Send password reset email
+// ── Password reset email ───────────────────────────────────────────────────
 export const sendPasswordResetEmail = async (email, name, token) => {
-  const transporter = getTransporter();
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
-  const mailOptions = {
-    from: getSender(),
-    to: email,
-    subject: 'Reset Your Password - AI Career Predictor',
-    html: `
+    const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -134,34 +144,26 @@ export const sendPasswordResetEmail = async (email, name, token) => {
         </head>
         <body>
           <div class="container">
-            <div class="header">
-              <h1>🔐 Password Reset Request</h1>
-            </div>
+            <div class="header"><h1>🔐 Password Reset Request</h1></div>
             <div class="content">
               <h2>Hi ${name},</h2>
-              <p>We received a request to reset your password. Click the button below to create a new password:</p>
-              <center>
-                <a href="${resetUrl}" class="button">Reset Password</a>
-              </center>
-              <p>Or copy and paste this link into your browser:</p>
-              <p style="background: #e0e0e0; padding: 10px; border-radius: 5px; word-break: break-all;">${resetUrl}</p>
-              <p><strong>This link will expire in 1 hour.</strong></p>
-              <p>If you didn't request a password reset, please ignore this email or contact support if you have concerns.</p>
+              <p>Click below to reset your password:</p>
+              <center><a href="${resetUrl}" class="button">Reset Password</a></center>
+              <p>Or paste this link: <br/><span style="background:#e0e0e0;padding:8px;border-radius:4px;word-break:break-all;">${resetUrl}</span></p>
+              <p><strong>This link expires in 1 hour.</strong></p>
+              <p>If you didn't request this, ignore this email.</p>
             </div>
-            <div class="footer">
-              <p>© 2026 AI Career Predictor. All rights reserved.</p>
-            </div>
+            <div class="footer"><p>© 2026 AI Career Predictor</p></div>
           </div>
         </body>
       </html>
-    `,
-  };
+    `;
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Password reset email sent to ${email}`);
-  } catch (error) {
-    console.error(`❌ Error sending password reset email: ${error.message}`);
-    throw error;
-  }
+    try {
+        await sendEmail(email, 'Reset Your Password - AI Career Predictor', html);
+        console.log(`✅ Password reset email sent to ${email}`);
+    } catch (error) {
+        console.error(`❌ Error sending password reset email: ${error.message}`);
+        throw error;
+    }
 };
