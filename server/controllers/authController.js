@@ -59,7 +59,6 @@ export const signup = async (req, res) => {
         // Check if user already exists (skip unverified stale entries older than 24h)
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            // Allow re-registration if user never verified and token has expired
             const isStaleUnverified =
                 !existingUser.verified &&
                 existingUser.verificationTokenExpires &&
@@ -73,8 +72,6 @@ export const signup = async (req, res) => {
                         : 'A verification email was already sent. Please check your inbox or wait 24 hours to re-register.',
                 });
             }
-
-            // Clean up the stale unverified record so we can re-create
             await User.deleteOne({ _id: existingUser._id });
         }
 
@@ -82,18 +79,7 @@ export const signup = async (req, res) => {
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
 
-        // ── STEP 1: Send email FIRST — only save to DB if email succeeds ──
-        try {
-            await sendVerificationEmail(email, name, verificationToken);
-        } catch (emailError) {
-            console.error('❌ Email sending failed — user NOT saved to DB:', emailError.message);
-            return res.status(500).json({
-                success: false,
-                message: 'Failed to send verification email. Please try again in a few minutes.',
-            });
-        }
-
-        // ── STEP 2: Email sent — now persist the user ──
+        // Save user first (verified=false — they cannot login until email is clicked)
         const user = await User.create({
             name,
             email,
@@ -102,9 +88,14 @@ export const signup = async (req, res) => {
             verificationTokenExpires,
         });
 
+        // Send verification email in background — never block signup
+        sendVerificationEmail(email, name, verificationToken)
+            .then(() => console.log(`✅ Verification email sent to ${email}`))
+            .catch((err) => console.error(`❌ Email failed for ${email}:`, err.message));
+
         res.status(201).json({
             success: true,
-            message: 'Account created! A verification email has been sent to ' + email + '. Please verify to activate your account.',
+            message: 'Account created! Please check your email to verify your account.',
             data: {
                 userId: user._id,
                 name: user.name,
