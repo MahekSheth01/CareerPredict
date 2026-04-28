@@ -1,18 +1,16 @@
 import axios from 'axios';
 import nodemailer from 'nodemailer';
 
-// ── Email sender helper ────────────────────────────────────────────────────
-// Priority: Brevo API → Resend SMTP → Gmail SMTP fallback
-
 const FROM_NAME = 'AI Career Predictor';
-const FROM_EMAIL = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@careerpredict.com';
+const getFromEmail = () => (process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@careerpredict.com').trim();
+const getBaseUrl = () => (process.env.FRONTEND_URL || 'http://localhost:5173').trim();
 
-// ── Send via Brevo REST API (most reliable, no SMTP needed) ───────────────
+// ── Send via Brevo REST API ────────────────────────────────────────────────
 const sendViaBrevo = async (to, subject, html) => {
     await axios.post(
         'https://api.brevo.com/v3/smtp/email',
         {
-            sender: { name: FROM_NAME, email: FROM_EMAIL },
+            sender: { name: FROM_NAME, email: getFromEmail() },
             to: [{ email: to }],
             subject,
             htmlContent: html,
@@ -26,7 +24,7 @@ const sendViaBrevo = async (to, subject, html) => {
     );
 };
 
-// ── Singleton nodemailer transporter (Resend or Gmail fallback) ───────────
+// ── Singleton nodemailer transporter (Resend or SMTP fallback) ────────────
 let _transporter = null;
 const getTransporter = () => {
     if (_transporter) return _transporter;
@@ -46,22 +44,15 @@ const getTransporter = () => {
             port,
             secure: port === 465,
             requireTLS: port === 587,
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASSWORD,
-            },
+            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASSWORD },
             tls: { rejectUnauthorized: false },
         });
         console.warn('⚠️  Using SMTP fallback for email delivery');
     }
 
     _transporter.verify((error) => {
-        if (error) {
-            console.error('❌ SMTP connection failed:', error.message);
-            _transporter = null;
-        } else {
-            console.log('✅ SMTP server is ready to send emails');
-        }
+        if (error) { console.error('❌ SMTP connection failed:', error.message); _transporter = null; }
+        else { console.log('✅ SMTP server is ready to send emails'); }
     });
 
     return _transporter;
@@ -74,50 +65,60 @@ const sendEmail = async (to, subject, html) => {
         await sendViaBrevo(to, subject, html);
     } else {
         const transporter = getTransporter();
-        await transporter.sendMail({
-            from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
-            to,
-            subject,
-            html,
-        });
+        await transporter.sendMail({ from: `"${FROM_NAME}" <${getFromEmail()}>`, to, subject, html });
     }
 };
 
+// ── Shared styles ──────────────────────────────────────────────────────────
+const baseStyles = `
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4ff;color:#333;padding:20px 0;}
+    .wrap{max-width:560px;margin:0 auto;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 8px 32px rgba(102,126,234,0.18);}
+    .hero{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:52px 32px 40px;text-align:center;}
+    .hero-icon{font-size:52px;display:block;margin-bottom:16px;}
+    .hero h1{color:#fff;font-size:24px;font-weight:700;letter-spacing:-0.3px;}
+    .hero p{color:rgba(255,255,255,0.8);font-size:14px;margin-top:8px;}
+    .body{padding:40px 36px;}
+    .body h2{font-size:20px;font-weight:600;color:#222;margin-bottom:12px;}
+    .body p{color:#666;font-size:15px;line-height:1.75;margin-bottom:16px;}
+    .btn-wrap{text-align:center;margin:36px 0 28px;}
+    .btn{display:inline-block;padding:16px 52px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff !important;text-decoration:none;border-radius:100px;font-size:16px;font-weight:700;letter-spacing:0.3px;box-shadow:0 4px 16px rgba(102,126,234,0.4);}
+    .note{background:#f5f7ff;border-left:4px solid #667eea;border-radius:8px;padding:14px 18px;font-size:13px;color:#888;margin-top:8px;}
+    .footer{background:#fafbff;border-top:1px solid #eef0ff;padding:24px 32px;text-align:center;}
+    .footer p{color:#bbb;font-size:12px;line-height:1.9;}
+`;
+
 // ── Verification email ─────────────────────────────────────────────────────
 export const sendVerificationEmail = async (email, name, token) => {
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+    const verificationUrl = `${getBaseUrl()}/verify-email?token=${token}`;
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-            .button { display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header"><h1>🚀 Welcome to AI Career Predictor!</h1></div>
-            <div class="content">
-              <h2>Hi ${name},</h2>
-              <p>Thank you for signing up! Please verify your email by clicking below:</p>
-              <center><a href="${verificationUrl}" class="button">Verify Email</a></center>
-              <p>Or paste this link: <br/><span style="background:#e0e0e0;padding:8px;border-radius:4px;word-break:break-all;">${verificationUrl}</span></p>
-              <p><strong>This link expires in 24 hours.</strong></p>
-            </div>
-            <div class="footer"><p>© 2026 AI Career Predictor</p></div>
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+      <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+      <style>${baseStyles}</style></head>
+      <body>
+        <div class="wrap">
+          <div class="hero">
+            <span class="hero-icon">🚀</span>
+            <h1>Welcome to AI Career Predictor!</h1>
+            <p>Your journey to the perfect career starts here</p>
           </div>
-        </body>
-      </html>
-    `;
+          <div class="body">
+            <h2>Hi ${name}! 👋</h2>
+            <p>Thanks for signing up! You're one step away from unlocking AI-powered career predictions tailored just for you.</p>
+            <p>Click the button below to verify your email and activate your account:</p>
+            <div class="btn-wrap">
+              <a href="${verificationUrl}" class="btn">✅ Verify My Email</a>
+            </div>
+            <div class="note">⏳ This link expires in <strong>24 hours</strong>. If you didn't create an account, you can safely ignore this email.</div>
+          </div>
+          <div class="footer">
+            <p>© 2026 AI Career Predictor · Built with ❤️<br/>If the button doesn't work, contact support.</p>
+          </div>
+        </div>
+      </body></html>`;
 
     try {
-        await sendEmail(email, 'Verify Your Email - AI Career Predictor', html);
+        await sendEmail(email, '🚀 Verify your email — AI Career Predictor', html);
         console.log(`✅ Verification email sent to ${email}`);
     } catch (error) {
         console.error(`❌ Error sending verification email: ${error.message}`);
@@ -127,40 +128,34 @@ export const sendVerificationEmail = async (email, name, token) => {
 
 // ── Password reset email ───────────────────────────────────────────────────
 export const sendPasswordResetEmail = async (email, name, token) => {
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const resetUrl = `${getBaseUrl()}/reset-password?token=${token}`;
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-            .button { display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header"><h1>🔐 Password Reset Request</h1></div>
-            <div class="content">
-              <h2>Hi ${name},</h2>
-              <p>Click below to reset your password:</p>
-              <center><a href="${resetUrl}" class="button">Reset Password</a></center>
-              <p>Or paste this link: <br/><span style="background:#e0e0e0;padding:8px;border-radius:4px;word-break:break-all;">${resetUrl}</span></p>
-              <p><strong>This link expires in 1 hour.</strong></p>
-              <p>If you didn't request this, ignore this email.</p>
-            </div>
-            <div class="footer"><p>© 2026 AI Career Predictor</p></div>
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+      <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+      <style>${baseStyles}</style></head>
+      <body>
+        <div class="wrap">
+          <div class="hero">
+            <span class="hero-icon">🔐</span>
+            <h1>Password Reset Request</h1>
+            <p>We got a request to reset your password</p>
           </div>
-        </body>
-      </html>
-    `;
+          <div class="body">
+            <h2>Hi ${name}! 👋</h2>
+            <p>No worries! Click the button below to create a new password. This link is only valid for <strong>1 hour</strong>.</p>
+            <div class="btn-wrap">
+              <a href="${resetUrl}" class="btn">🔑 Reset My Password</a>
+            </div>
+            <div class="note">🛡️ If you didn't request a password reset, you can safely ignore this email. Your password will not change.</div>
+          </div>
+          <div class="footer">
+            <p>© 2026 AI Career Predictor · Built with ❤️<br/>If the button doesn't work, contact support.</p>
+          </div>
+        </div>
+      </body></html>`;
 
     try {
-        await sendEmail(email, 'Reset Your Password - AI Career Predictor', html);
+        await sendEmail(email, '🔐 Reset your password — AI Career Predictor', html);
         console.log(`✅ Password reset email sent to ${email}`);
     } catch (error) {
         console.error(`❌ Error sending password reset email: ${error.message}`);
